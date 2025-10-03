@@ -1,0 +1,65 @@
+services:
+    app:
+        build:
+            context: .
+            # УБЕРИТЕ ЭТУ СТРОКУ - target: production
+        ports:
+            - "3000:3000"
+        environment:
+            - NODE_ENV=production
+            - NODE_OPTIONS=--enable-source-maps
+            # Database
+            - DB_HOST=postgres
+            - DB_PORT=5432
+            - DB_NAME=${DB_NAME:-myapp}
+            - DB_USER=${DB_USER:-postgres}
+            - DB_PASSWORD=${DB_PASSWORD:-password}
+            # App
+            - APP_PORT=3000
+            # Wildberries
+            - WB_API_TOKEN=${WB_API_TOKEN}
+            - WB_API_URL=${WB_API_URL:-https://common-api.wildberries.ru/api/v1/tariffs/box}
+            - SCHEDULER_CRON=${SCHEDULER_CRON:-0 * * * *}
+            # Google
+            - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
+            - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
+            - GOOGLE_SHEET_IDS=${GOOGLE_SHEET_IDS}
+        depends_on:
+            postgres:
+                condition: service_healthy
+        networks:
+            - app-network
+        healthcheck:
+            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        restart: unless-stopped
+
+    postgres:
+        image: postgres:15-alpine
+        environment:
+            POSTGRES_DB: ${DB_NAME:-myapp}
+            POSTGRES_USER: ${DB_USER:-postgres}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        networks:
+            - app-network
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-myapp}"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+            start_period: 10s
+        restart: unless-stopped
+
+volumes:
+    postgres_data:
+
+networks:
+    app-network:
+        driver: bridge
